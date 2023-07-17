@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Marcel Hauf <oss@marcelhauf.name"]
 description = "Query and operate with serde_json Values"
+license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/jops"
 repository = "https://github.com/marshauf/jops"
 readme = "README.md"
