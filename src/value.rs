@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, mem::size_of_val};
 
 use serde_json::Value;
 
@@ -65,11 +65,11 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
         (Value::String(_), _) => Some(Ordering::Less),
         (_, Value::String(_)) => Some(Ordering::Greater),
 
-        // TODO Should be memory compared instead of length
-        (Value::Array(a), Value::Array(b)) => a.len().partial_cmp(&b.len()),
-        (Value::Array(a), Value::Object(b)) => a.len().partial_cmp(&b.len()),
-        (Value::Object(a), Value::Array(b)) => a.len().partial_cmp(&b.len()),
-        (Value::Object(a), Value::Object(b)) => a.len().partial_cmp(&b.len()),
+        // Compare Arrays and Objects by memory size
+        (Value::Array(a), Value::Array(b)) => size_of_val(a).partial_cmp(&size_of_val(b)),
+        (Value::Array(a), Value::Object(b)) => size_of_val(a).partial_cmp(&size_of_val(b)),
+        (Value::Object(a), Value::Array(b)) => size_of_val(a).partial_cmp(&size_of_val(b)),
+        (Value::Object(a), Value::Object(b)) => size_of_val(a).partial_cmp(&size_of_val(b)),
     }
 }
 
