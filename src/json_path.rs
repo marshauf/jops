@@ -50,15 +50,40 @@ impl JsonPath {
     pub fn find<'a>(&self, value: &'a Value) -> Option<&'a Value> {
         let mut value = value;
         for e in &self.0 {
-            value = match e {
-                JsonPathElement::Field(key) => value.get(key).unwrap_or(&Value::Null),
-                JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => {
-                    value.get(i).unwrap_or(&Value::Null)
+            let sub = match e {
+                JsonPathElement::Field(key) => value.get(key),
+                JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get(i),
+                JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
+                    value.as_array().and_then(|a| a.get(a.len() - i))
                 }
-                JsonPathElement::Index(JsonPathIndex::NthRight(i)) => value
-                    .as_array()
-                    .map_or(&Value::Null, |a| a.get(a.len() - i).unwrap_or(&Value::Null)),
             };
+            if let Some(sub) = sub {
+                value = sub;
+            } else {
+                return None;
+            }
+        }
+        Some(value)
+    }
+
+    pub fn find_mut<'a>(&self, value: &'a mut Value) -> Option<&'a mut Value> {
+        let mut value = value;
+        for e in &self.0 {
+            let sub = match e {
+                JsonPathElement::Field(key) => value.get_mut(key),
+                JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get_mut(i),
+                JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
+                    value.as_array_mut().and_then(|v| {
+                        let i = v.len() - i;
+                        v.get_mut(i)
+                    })
+                }
+            };
+            if let Some(sub) = sub {
+                value = sub;
+            } else {
+                return None;
+            }
         }
         Some(value)
     }
@@ -136,6 +161,7 @@ impl TryFrom<&str> for JsonPath {
 
 pub trait JsonPathQuery<'a> {
     fn path(&'a self, query: &str) -> Result<&'a Value, &'static str>;
+    fn path_mut(&'a mut self, query: &str) -> Result<&'a mut Value, &'static str>;
 }
 
 impl<'a> JsonPathQuery<'a> for Value {
@@ -143,6 +169,12 @@ impl<'a> JsonPathQuery<'a> for Value {
     fn path(&'a self, query: &str) -> Result<&'a Value, &'static str> {
         let path = JsonPath::try_from(query)?;
         path.find(self).ok_or("unable to find path to value")
+    }
+
+    #[inline]
+    fn path_mut(&'a mut self, query: &str) -> Result<&'a mut Value, &'static str> {
+        let path = JsonPath::try_from(query)?;
+        path.find_mut(self).ok_or("unable to find path to value")
     }
 }
 
@@ -251,11 +283,21 @@ mod tests {
                 Ok(json!("example")),
             ),
             ("1", json!([1, 2, 4]), Ok(json!(2))),
+            ("$[2]", json!([1]), Err("unable to find path to value")),
         ];
 
         for (path, value, expected) in tests {
             assert_eq!(
                 value.path(path).cloned(),
+                expected,
+                "expected {} from {} to be {:?}",
+                value,
+                path,
+                expected
+            );
+            let mut value = value;
+            assert_eq!(
+                value.path_mut(path).cloned(),
                 expected,
                 "expected {} from {} to be {:?}",
                 value,
