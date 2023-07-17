@@ -74,7 +74,7 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JsonValue<'a>(&'a Value);
+pub struct JsonValue<'a>(pub &'a Value);
 
 impl<'a> PartialOrd for JsonValue<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
