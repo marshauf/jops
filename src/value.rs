@@ -11,7 +11,8 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
     }
     match (a, b) {
         // Equal types
-        (Value::Null, Value::Null) => None,
+        // Anything with Null can't be compared
+        (Value::Null | _, Value::Null) | (Value::Null, _) => None,
         (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
         (Value::Number(a), Value::Number(b)) => {
             // Try to be as precise as possible
@@ -26,9 +27,6 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
             }
         }
         (Value::String(a), Value::String(b)) => a.partial_cmp(b),
-
-        // Anything with null
-        (Value::Null, _) | (_, Value::Null) => None,
 
         // Unequal types with casting
         (Value::Number(a), Value::Bool(b)) => {
@@ -77,6 +75,7 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
 pub struct JsonValue<'a>(pub &'a Value);
 
 impl<'a> PartialOrd for JsonValue<'a> {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         partial_cmp(self.0, other.0)
     }

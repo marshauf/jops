@@ -14,7 +14,7 @@ pub enum JsonPathElement {
 impl ToString for JsonPathElement {
     fn to_string(&self) -> String {
         match self {
-            JsonPathElement::Field(v) => v.to_owned(),
+            JsonPathElement::Field(v) => v.clone(),
             JsonPathElement::Index(i) => i.to_string(),
         }
     }
@@ -30,7 +30,7 @@ impl ToString for JsonPathIndex {
     fn to_string(&self) -> String {
         match self {
             JsonPathIndex::NthLefth(i) => i.to_string(),
-            JsonPathIndex::NthRight(i) => format!("#-{}", i),
+            JsonPathIndex::NthRight(i) => format!("#-{i}"),
         }
     }
 }
@@ -42,13 +42,14 @@ const CLOSE_INDEX: char = ']';
 const BEGIN_REVERSE_INDEX: char = '#';
 
 impl JsonPath {
+    #[inline]
     pub fn last(&self) -> Option<&JsonPathElement> {
         self.0.last()
     }
 
     pub fn find<'a>(&self, value: &'a Value) -> Option<&'a Value> {
         let mut value = value;
-        for e in self.0.iter() {
+        for e in &self.0 {
             value = match e {
                 JsonPathElement::Field(key) => value.get(key).unwrap_or(&Value::Null),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => {
@@ -56,8 +57,7 @@ impl JsonPath {
                 }
                 JsonPathElement::Index(JsonPathIndex::NthRight(i)) => value
                     .as_array()
-                    .map(|a| a.get(a.len() - i).unwrap_or(&Value::Null))
-                    .unwrap_or(&Value::Null),
+                    .map_or(&Value::Null, |a| a.get(a.len() - i).unwrap_or(&Value::Null)),
             };
         }
         Some(value)
@@ -127,6 +127,8 @@ impl FromStr for JsonPath {
 
 impl TryFrom<&str> for JsonPath {
     type Error = &'static str;
+
+    #[inline]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         JsonPath::from_str(value)
     }
@@ -137,6 +139,7 @@ pub trait JsonPathQuery<'a> {
 }
 
 impl<'a> JsonPathQuery<'a> for Value {
+    #[inline]
     fn path(&'a self, query: &str) -> Result<&'a Value, &'static str> {
         let path = JsonPath::try_from(query)?;
         path.find(self).ok_or("unable to find path to value")
