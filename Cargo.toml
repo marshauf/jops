@@ -1,0 +1,15 @@
+[package]
+name = "jops"
+version = "0.1.0"
+edition = "2021"
+authors = ["Marcel Hauf <oss@marcelhauf.name"]
+description = "Query and operate with serde_json Values"
+documentation = "https://docs.rs/jops"
+repository = "https://github.com/marshauf/jops"
+readme = "README.md"
+keywords = ["json", "serde", "serde_json", "path", "operator"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde_json = "1.0"
