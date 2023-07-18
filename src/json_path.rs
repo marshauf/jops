@@ -118,9 +118,8 @@ impl FromStr for JsonPath {
                     path.push(JsonPathElement::Field(field));
                 }
                 Some(BEGIN_INDEX) => {
-                    let index = if iter.next_if_eq(&BEGIN_REVERSE_INDEX).is_some()
-                        && iter.next_if_eq(&'-').is_some()
-                    {
+                    let index = if iter.next_if_eq(&BEGIN_REVERSE_INDEX).is_some() {
+                        iter.next_if_eq(&'-');
                         JsonPathIndex::NthRight(0)
                     } else {
                         JsonPathIndex::NthLefth(0)
@@ -135,10 +134,10 @@ impl FromStr for JsonPath {
                     }
                     let index = match index {
                         JsonPathIndex::NthLefth(_) => {
-                            JsonPathIndex::NthLefth(field.parse().unwrap())
+                            JsonPathIndex::NthLefth(field.parse().unwrap_or(0))
                         }
                         JsonPathIndex::NthRight(_) => {
-                            JsonPathIndex::NthRight(field.parse().unwrap())
+                            JsonPathIndex::NthRight(field.parse().unwrap_or(0))
                         }
                     };
                     path.push(JsonPathElement::Index(index));
@@ -242,6 +241,13 @@ mod tests {
                     JsonPathElement::Index(JsonPathIndex::NthRight(4)),
                     JsonPathElement::Field("b".to_string()),
                     JsonPathElement::Index(JsonPathIndex::NthLefth(3)),
+                ])),
+            ),
+            (
+                "$.a[#]",
+                Ok(JsonPath(vec![
+                    JsonPathElement::Field("a".to_string()),
+                    JsonPathElement::Index(JsonPathIndex::NthRight(0)),
                 ])),
             ),
             // Invalid
