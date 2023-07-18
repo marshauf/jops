@@ -87,6 +87,49 @@ impl JsonPath {
         }
         Some(value)
     }
+
+    pub fn insert<'a>(&self, value: &'a mut Value, v: Value) -> Option<&'a Value> {
+        if let Some((last, rest)) = self.0.split_last() {
+            if let Some(target) = JsonPath(rest.to_vec()).find_mut(value) {
+                match (target, last) {
+                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i))) => {
+                        let i = *i;
+                        if i <= target.len() {
+                            target.insert(i, v);
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    }
+                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i))) => {
+                        if target.len() < *i {
+                            return None;
+                        }
+                        let i = target.len() - i;
+                        if i <= target.len() {
+                            target.insert(i, v);
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    }
+                    (Value::Object(target), JsonPathElement::Field(key)) => {
+                        if !target.contains_key(key) {
+                            target.insert(key.clone(), v);
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl FromStr for JsonPath {
@@ -101,7 +144,8 @@ impl FromStr for JsonPath {
                 while let Some(c) = iter.next_if(|c| c.is_numeric()) {
                     field.push(c);
                 }
-                let index = JsonPathElement::Index(JsonPathIndex::NthLefth(field.parse().unwrap()));
+                let index =
+                    JsonPathElement::Index(JsonPathIndex::NthLefth(field.parse().unwrap_or(0)));
                 return Ok(JsonPath(vec![index]));
             }
             _ => return Err("expected $ or numeric"),
@@ -308,6 +352,70 @@ mod tests {
                 "expected {} from {} to be {:?}",
                 value,
                 path,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn insert() {
+        let tests: Vec<(
+            JsonPath,
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        )> = vec![
+            (
+                "$.a".try_into().unwrap(),
+                json!({}),
+                json!("test"),
+                Some(json!({ "a": "test"})),
+            ),
+            (
+                "$.a.b[1]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                json!("test"),
+                Some(json!({ "a": { "b": [1, "test", 2, 4]}})),
+            ),
+            (
+                "$.a.b[#]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                json!("test"),
+                Some(json!({ "a": { "b": [1, 2, 4, "test"]}})),
+            ),
+            (
+                "$.a.b[#-3]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                json!("test"),
+                Some(json!({ "a": { "b": ["test", 1, 2, 4 ]}})),
+            ),
+            (
+                "$.a".try_into().unwrap(),
+                json!({"a": 10.0}),
+                json!("test"),
+                None,
+            ),
+            (
+                "$.a[1]".try_into().unwrap(),
+                json!({"a": []}),
+                json!("test"),
+                None,
+            ),
+            (
+                "$.a[#-3]".try_into().unwrap(),
+                json!({"a": []}),
+                json!("test"),
+                None,
+            ),
+        ];
+
+        for (path, mut value, extra, expected) in tests {
+            let value = path.insert(&mut value, extra);
+            assert_eq!(
+                value,
+                expected.as_ref(),
+                "expected {:?} to be {:?}",
+                value,
                 expected
             );
         }
