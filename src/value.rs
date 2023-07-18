@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, mem::size_of_val};
+use std::{cmp::Ordering, mem::size_of_val, ops::Deref};
 
 use serde_json::Value;
 
@@ -72,12 +72,34 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct JsonValue<'a>(pub &'a Value);
+pub struct JsonValue<'a>(&'a Value);
+
+impl<'a> JsonValue<'a> {
+    pub fn new(value: &'a Value) -> Self {
+        JsonValue(value)
+    }
+}
 
 impl<'a> PartialOrd for JsonValue<'a> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         partial_cmp(self.0, other.0)
+    }
+}
+
+impl<'a> From<&'a Value> for JsonValue<'a> {
+    #[inline]
+    fn from(value: &'a Value) -> Self {
+        JsonValue(value)
+    }
+}
+
+impl<'a> Deref for JsonValue<'a> {
+    type Target = serde_json::Value;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 
@@ -124,8 +146,8 @@ mod tests {
             (json!([0, 1]), Value::Bool(false), Some(Ordering::Greater)),
         ];
         for (ref a, ref b, expected) in tests {
-            let a = JsonValue(a);
-            let b = JsonValue(b);
+            let a: JsonValue = a.into();
+            let b: JsonValue = b.into();
             let result = PartialOrd::partial_cmp(&a, &b);
             assert_eq!(
                 result, expected,
