@@ -2,9 +2,17 @@ use std::{cmp::Ordering, mem::size_of_val, ops::Deref};
 
 use serde_json::Value;
 
-// Compares two Json Values. Follows SQL JSON Operators.
-// Value::Null can't be compared and returns None.
-// Value::Bool can be compared to Value::Number.
+/// Compares two `serde_json::Value`s.
+///
+/// Follows SQL JSON Operators.
+/// Comparing any Value with `Value::Null` returns None.
+/// `Value::Bool` is casted to a f64, when comparing with Value::Number.
+/// `Value::Bool` is always less than a String, Array, or Object.
+/// `Value::Number` is always less than a String, Array, or Object.
+/// `Value::String` is always less than an Array, or Object.
+/// Comparing a `Value::String` with a `Value::Number` trys to parse the String as a f64 for
+/// comparison.
+/// Arrays and Objects get compared by memory.
 pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
     if a == b {
         return Some(Ordering::Equal);
