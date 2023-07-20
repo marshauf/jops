@@ -54,7 +54,12 @@ impl JsonPath {
                 JsonPathElement::Field(key) => value.get(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get(i),
                 JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
-                    value.as_array().and_then(|a| a.get(a.len() - i))
+                    value.as_array().and_then(|a| {
+                        if a.len() < *i {
+                            return None;
+                        }
+                        a.get(a.len() - i)
+                    })
                 }
             };
             if let Some(sub) = sub {
@@ -73,9 +78,12 @@ impl JsonPath {
                 JsonPathElement::Field(key) => value.get_mut(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get_mut(i),
                 JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
-                    value.as_array_mut().and_then(|v| {
-                        let i = v.len() - i;
-                        v.get_mut(i)
+                    value.as_array_mut().and_then(|a| {
+                        if a.len() < *i {
+                            return None;
+                        }
+                        let i = a.len() - i;
+                        a.get_mut(i)
                     })
                 }
             };
@@ -334,6 +342,11 @@ mod tests {
             ),
             ("1", json!([1, 2, 4]), Ok(json!(2))),
             ("$[2]", json!([1]), Err("unable to find path to value")),
+            (
+                "$.a[#-2]",
+                json!({ "b": [1] }),
+                Err("unable to find path to value"),
+            ),
         ];
 
         for (path, value, expected) in tests {
