@@ -138,6 +138,15 @@ impl JsonPath {
             None
         }
     }
+
+    pub fn replace<'a>(&self, value: &'a mut Value, v: Value) -> Option<&'a Value> {
+        if let Some(target) = self.find_mut(value) {
+            *target = v;
+            Some(value)
+        } else {
+            None
+        }
+    }
 }
 
 impl FromStr for JsonPath {
@@ -424,6 +433,59 @@ mod tests {
 
         for (path, mut value, extra, expected) in tests {
             let value = path.insert(&mut value, extra);
+            assert_eq!(
+                value,
+                expected.as_ref(),
+                "expected {:?} to be {:?}",
+                value,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn replace() {
+        let tests: Vec<(
+            JsonPath,
+            serde_json::Value,
+            serde_json::Value,
+            Option<serde_json::Value>,
+        )> = vec![
+            ("$.a".try_into().unwrap(), json!({}), json!("test"), None),
+            (
+                "$.a.b[1]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                json!("test"),
+                Some(json!({ "a": { "b": [1, "test", 4]}})),
+            ),
+            (
+                "$.a.b[#-2]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                json!("test"),
+                Some(json!({ "a": { "b": [1, "test", 4 ]}})),
+            ),
+            (
+                "$.a".try_into().unwrap(),
+                json!({"a": 10.0}),
+                json!("test"),
+                Some(json!({"a": "test"})),
+            ),
+            (
+                "$.a[1]".try_into().unwrap(),
+                json!({"a": []}),
+                json!("test"),
+                None,
+            ),
+            (
+                "$.a[#-3]".try_into().unwrap(),
+                json!({"a": []}),
+                json!("test"),
+                None,
+            ),
+        ];
+
+        for (path, mut value, extra, expected) in tests {
+            let value = path.replace(&mut value, extra);
             assert_eq!(
                 value,
                 expected.as_ref(),
