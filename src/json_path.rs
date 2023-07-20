@@ -185,6 +185,44 @@ impl JsonPath {
             None
         }
     }
+
+    pub fn remove<'a>(&self, value: &'a mut Value) -> Option<&'a Value> {
+        if let Some((last, rest)) = self.0.split_last() {
+            if let Some(target) = JsonPath(rest.to_vec()).find_mut(value) {
+                match (target, last) {
+                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i))) => {
+                        if target.len() < *i {
+                            None
+                        } else {
+                            target.remove(*i);
+                            Some(value)
+                        }
+                    }
+                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i))) => {
+                        if target.len() < *i {
+                            None
+                        } else {
+                            let i = target.len() - i;
+                            target.remove(i);
+                            Some(value)
+                        }
+                    }
+                    (Value::Object(target), JsonPathElement::Field(key)) => {
+                        if target.remove(key).is_some() {
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl FromStr for JsonPath {
@@ -582,6 +620,41 @@ mod tests {
 
         for (path, mut value, extra, expected) in tests {
             let value = path.set(&mut value, extra);
+            assert_eq!(
+                value,
+                expected.as_ref(),
+                "expected {:?} to be {:?}",
+                value,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn remove() {
+        let tests: Vec<(JsonPath, serde_json::Value, Option<serde_json::Value>)> = vec![
+            ("$.a".try_into().unwrap(), json!({}), None),
+            (
+                "$.a.b[1]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,8] }}),
+                Some(json!({ "a": { "b": [1, 8]}})),
+            ),
+            (
+                "$.a.b[#-2]".try_into().unwrap(),
+                json!({"a": { "b": [1,2,4] }}),
+                Some(json!({ "a": { "b": [1, 4 ]}})),
+            ),
+            (
+                "$.a".try_into().unwrap(),
+                json!({"a": 10.0}),
+                Some(json!({})),
+            ),
+            ("$.a[1]".try_into().unwrap(), json!({"a": []}), None),
+            ("$.a[#-3]".try_into().unwrap(), json!({"a": []}), None),
+        ];
+
+        for (path, mut value, expected) in tests {
+            let value = path.remove(&mut value);
             assert_eq!(
                 value,
                 expected.as_ref(),
