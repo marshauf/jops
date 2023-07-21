@@ -6,7 +6,7 @@ use serde_json::Value;
 ///
 /// Follows SQL JSON Operators.
 /// Comparing any Value with `Value::Null` returns None.
-/// `Value::Bool` is casted to a f64, when comparing with Value::Number.
+/// `Value::Bool` is casted to a f64, when comparing with `Value::Number`.
 /// `Value::Bool` is always less than a String, Array, or Object.
 /// `Value::Number` is always less than a String, Array, or Object.
 /// `Value::String` is always less than an Array, or Object.
@@ -79,6 +79,7 @@ pub fn partial_cmp(a: &Value, b: &Value) -> Option<Ordering> {
     }
 }
 
+/// Wraps a reference to a `serde_json::Value` and provides `PartialOrd` implementation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JsonValue<'a>(&'a Value);
 
