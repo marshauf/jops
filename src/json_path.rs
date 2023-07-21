@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use serde_json::Value;
 
@@ -60,15 +63,25 @@ fn get_right_mut(array: &mut Vec<Value>, i: usize) -> Option<&mut Value> {
     }
 }
 
-impl JsonPath {
-    #[inline]
-    pub fn last(&self) -> Option<&JsonPathElement> {
-        self.0.last()
-    }
+impl Deref for JsonPath {
+    type Target = Vec<JsonPathElement>;
 
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for JsonPath {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl JsonPath {
     pub fn find<'a>(&self, value: &'a Value) -> Option<&'a Value> {
         let mut value = value;
-        for e in &self.0 {
+        for e in self.iter() {
             let sub = match e {
                 JsonPathElement::Field(key) => value.get(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get(i),
@@ -87,7 +100,7 @@ impl JsonPath {
 
     pub fn find_mut<'a>(&self, value: &'a mut Value) -> Option<&'a mut Value> {
         let mut value = value;
-        for e in &self.0 {
+        for e in self.iter() {
             let sub = match e {
                 JsonPathElement::Field(key) => value.get_mut(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get_mut(i),
@@ -205,7 +218,7 @@ impl JsonPath {
     }
 
     fn find_last_mut<'a>(&self, value: &'a mut Value) -> Option<(&'a mut Value, &JsonPathElement)> {
-        self.0.split_last().and_then(|(last, rest)| {
+        self.split_last().and_then(|(last, rest)| {
             JsonPath(rest.to_vec())
                 .find_mut(value)
                 .map(|target| (target, last))
