@@ -41,6 +41,25 @@ const BEGIN_INDEX: char = '[';
 const CLOSE_INDEX: char = ']';
 const BEGIN_REVERSE_INDEX: char = '#';
 
+// Get element of arrray from right side without panic.
+fn get_right(array: &Vec<Value>, i: usize) -> Option<&Value> {
+    if array.len() < i {
+        None
+    } else {
+        array.get(array.len() - i)
+    }
+}
+
+// Get mutable element of array from right side without panic.
+fn get_right_mut(array: &mut Vec<Value>, i: usize) -> Option<&mut Value> {
+    if array.len() < i {
+        None
+    } else {
+        let i = array.len() - i;
+        array.get_mut(i)
+    }
+}
+
 impl JsonPath {
     #[inline]
     pub fn last(&self) -> Option<&JsonPathElement> {
@@ -54,12 +73,7 @@ impl JsonPath {
                 JsonPathElement::Field(key) => value.get(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get(i),
                 JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
-                    value.as_array().and_then(|a| {
-                        if a.len() < *i {
-                            return None;
-                        }
-                        a.get(a.len() - i)
-                    })
+                    value.as_array().and_then(|a| get_right(a, *i))
                 }
             };
             if let Some(sub) = sub {
@@ -78,13 +92,7 @@ impl JsonPath {
                 JsonPathElement::Field(key) => value.get_mut(key),
                 JsonPathElement::Index(JsonPathIndex::NthLefth(i)) => value.get_mut(i),
                 JsonPathElement::Index(JsonPathIndex::NthRight(i)) => {
-                    value.as_array_mut().and_then(|a| {
-                        if a.len() < *i {
-                            return None;
-                        }
-                        let i = a.len() - i;
-                        a.get_mut(i)
-                    })
+                    value.as_array_mut().and_then(|a| get_right_mut(a, *i))
                 }
             };
             if let Some(sub) = sub {
@@ -97,45 +105,37 @@ impl JsonPath {
     }
 
     pub fn insert<'a>(&self, value: &'a mut Value, v: Value) -> Option<&'a Value> {
-        if let Some((last, rest)) = self.0.split_last() {
-            if let Some(target) = JsonPath(rest.to_vec()).find_mut(value) {
-                match (target, last) {
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i))) => {
-                        let i = *i;
-                        if i <= target.len() {
-                            target.insert(i, v);
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i))) => {
-                        if target.len() < *i {
-                            return None;
-                        }
-                        let i = target.len() - i;
-                        if i <= target.len() {
-                            target.insert(i, v);
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    (Value::Object(target), JsonPathElement::Field(key)) => {
-                        if !target.contains_key(key) {
-                            target.insert(key.clone(), v);
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
+        match self.find_last_mut(value) {
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i)))) => {
+                let i = *i;
+                if i <= target.len() {
+                    target.insert(i, v);
+                    Some(value)
+                } else {
+                    None
                 }
-            } else {
-                None
             }
-        } else {
-            None
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i)))) => {
+                if target.len() < *i {
+                    return None;
+                }
+                let i = target.len() - i;
+                if i <= target.len() {
+                    target.insert(i, v);
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            Some((Value::Object(target), JsonPathElement::Field(key))) => {
+                if !target.contains_key(key) {
+                    target.insert(key.clone(), v);
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 
@@ -149,79 +149,67 @@ impl JsonPath {
     }
 
     pub fn set<'a>(&self, value: &'a mut Value, v: Value) -> Option<&'a Value> {
-        if let Some((last, rest)) = self.0.split_last() {
-            if let Some(target) = JsonPath(rest.to_vec()).find_mut(value) {
-                match (target, last) {
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i))) => {
-                        if let Some(target) = target.get_mut(*i) {
-                            *target = v;
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i))) => {
-                        if target.len() < *i {
-                            return None;
-                        }
-                        let i = target.len() - i;
-                        if let Some(target) = target.get_mut(i) {
-                            *target = v;
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    (Value::Object(target), JsonPathElement::Field(key)) => {
-                        target.insert(key.clone(), v);
-                        Some(value)
-                    }
-                    _ => None,
+        match self.find_last_mut(value) {
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i)))) => {
+                if let Some(target) = target.get_mut(*i) {
+                    *target = v;
+                    Some(value)
+                } else {
+                    None
                 }
-            } else {
-                None
             }
-        } else {
-            None
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i)))) => {
+                if let Some(target) = get_right_mut(target, *i) {
+                    *target = v;
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            Some((Value::Object(target), JsonPathElement::Field(key))) => {
+                target.insert(key.clone(), v);
+                Some(value)
+            }
+            _ => None,
         }
     }
 
     pub fn remove<'a>(&self, value: &'a mut Value) -> Option<&'a Value> {
-        if let Some((last, rest)) = self.0.split_last() {
-            if let Some(target) = JsonPath(rest.to_vec()).find_mut(value) {
-                match (target, last) {
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i))) => {
-                        if target.len() < *i {
-                            None
-                        } else {
-                            target.remove(*i);
-                            Some(value)
-                        }
-                    }
-                    (Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i))) => {
-                        if target.len() < *i {
-                            None
-                        } else {
-                            let i = target.len() - i;
-                            target.remove(i);
-                            Some(value)
-                        }
-                    }
-                    (Value::Object(target), JsonPathElement::Field(key)) => {
-                        if target.remove(key).is_some() {
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
+        match self.find_last_mut(value) {
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthLefth(i)))) => {
+                if target.len() < *i {
+                    None
+                } else {
+                    target.remove(*i);
+                    Some(value)
                 }
-            } else {
-                None
             }
-        } else {
-            None
+            Some((Value::Array(target), JsonPathElement::Index(JsonPathIndex::NthRight(i)))) => {
+                if target.len() < *i {
+                    None
+                } else {
+                    let i = target.len() - i;
+                    target.remove(i);
+                    Some(value)
+                }
+            }
+            Some((Value::Object(target), JsonPathElement::Field(key))) => {
+                if target.remove(key).is_some() {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
+    }
+
+    fn find_last_mut<'a>(&self, value: &'a mut Value) -> Option<(&'a mut Value, &JsonPathElement)> {
+        self.0.split_last().and_then(|(last, rest)| {
+            JsonPath(rest.to_vec())
+                .find_mut(value)
+                .map(|target| (target, last))
+        })
     }
 }
 
