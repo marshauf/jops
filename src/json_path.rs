@@ -141,11 +141,11 @@ impl JsonPath {
                 }
             }
             Some((Value::Object(target), JsonPathElement::Field(key))) => {
-                if !target.contains_key(key) {
+                if target.contains_key(key) {
+                    None
+                } else {
                     target.insert(key.clone(), v);
                     Some(value)
-                } else {
-                    None
                 }
             }
             _ => None,
